@@ -1,21 +1,23 @@
-apiVersion: 'app.claw.cloud/v1'
+apiVersion: app.claw.cloud/v1
 kind: Template
 metadata:
   name: palworld
 spec:
-  title: 'Palworld'
-  description: 'Palworld Dedicated Server'
+  title: 'Palworld Dedicated Server'
   url: 'https://github.com/thijsvanloef/palworld-server-docker'
   gitRepo: 'https://github.com/thijsvanloef/palworld-server-docker'
+  description: 'Palworld Dedicated Server'
   readme: 'https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/palworld/README.md'
-  icon: 'https://raw.githubusercontent.com/labring-actions/templates/main/template/palworld/logo.jpg'
+  icon: 'https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/palworld/logo.jpg'
   templateType: inline
   locale: en
   categories:
     - game
-  draft: true
   defaults:
     app_name:
+      type: string
+      value: palworld-${{ random(8) }}
+    app_host:
       type: string
       value: palworld-${{ random(8) }}
   inputs:
@@ -36,14 +38,24 @@ spec:
       required: false
 
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${{ defaults.app_name }}
+data:
+  vn-tmpvn-palworldsettingsvn-ini: |-
+    [/Script/Pal.PalGameWorldSettings]
+    OptionSettings=(Difficulty=None,DayTimeSpeedRate=1.000000,NightTimeSpeedRate=1.000000,ExpRate=1.000000,PalCaptureRate=1.000000,PalSpawnNumRate=1.000000,PalDamageRateAttack=1.000000,PalDamageRateDefense=1.000000,PlayerDamageRateAttack=1.000000,PlayerDamageRateDefense=1.000000,PlayerStomachDecreaceRate=1.000000,PlayerStaminaDecreaceRate=1.000000,PlayerAutoHPRegeneRate=1.000000,PlayerAutoHpRegeneRateInSleep=1.000000,PalStomachDecreaceRate=1.000000,PalStaminaDecreaceRate=1.000000,PalAutoHPRegeneRate=1.000000,PalAutoHpRegeneRateInSleep=1.000000,BuildObjectDamageRate=1.000000,BuildObjectDeteriorationDamageRate=1.000000,CollectionDropRate=1.000000,CollectionObjectHpRate=1.000000,CollectionObjectRespawnSpeedRate=1.000000,EnemyDropItemRate=1.000000,DeathPenalty=All,bEnablePlayerToPlayerDamage=False,bEnableFriendlyFire=False,bEnableInvaderEnemy=True,bActiveUNKO=False,bEnableAimAssistPad=True,bEnableAimAssistKeyboard=False,DropItemMaxNum=3000,DropItemMaxNum_UNKO=100,BaseCampMaxNum=128,BaseCampWorkerMaxNum=15,DropItemAliveMaxHours=1.000000,bAutoResetGuildNoOnlinePlayers=False,AutoResetGuildTimeNoOnlinePlayers=72.000000,GuildPlayerMaxNum=20,PalEggDefaultHatchingTime=72.000000,WorkSpeedRate=1.000000,bIsMultiplay=False,bIsPvP=False,bCanPickupOtherGuildDeathPenaltyDrop=False,bEnableNonLoginPenalty=True,bEnableFastTravel=True,bIsStartLocationSelectByMap=True,bExistPlayerAfterLogout=False,bEnableDefenseOtherGuildPlayer=False,CoopPlayerMaxNum=4,ServerPlayerMaxNum=32,ServerName="Default Palworld Server",ServerDescription="",AdminPassword="",ServerPassword="",PublicPort=8211,PublicIP="",RCONEnabled=true,RCONPort=25575,Region="",bUseAuth=True,BanListURL="https://api.palworldgame.com/api/banlist.txt")
+
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: ${{ defaults.app_name }}
   annotations:
-    originImageName: thijsvanloef/palworld-server-docker:latest
-    deploy.run.claw.cloud/minReplicas: "1"
-    deploy.run.claw.cloud/maxReplicas: "1"
+    originImageName: thijsvanloef/palworld-server-docker
+    deploy.run.claw.cloud/minReplicas: '1'
+    deploy.run.claw.cloud/maxReplicas: '1'
   labels:
     run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
     app: ${{ defaults.app_name }}
@@ -61,39 +73,46 @@ spec:
         app: ${{ defaults.app_name }}
     spec:
       terminationGracePeriodSeconds: 10
+      automountServiceAccountToken: false
       initContainers:
         - name: take-data-dir-ownership
           image: alpine
-          command: ["/bin/sh", "-c", "chown -R 1000:1000 /palworld; chmod -R 770 /palworld"]
+          # Give `grafana` user (id 472) permissions a mounted volume
+          # https://github.com/grafana/grafana-docker/blob/master/Dockerfile
+          command: ["/bin/sh", "-c", "chown -R 1000:1000 /palworld; chmod -R 770 /palworld; if [ -d /palworld/Pal/Saved/Config/LinuxServer ]; then cp /tmp/PalWorldSettings.ini /palworld/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini; fi; if [ -f /palworld/Pal/Saved/Config/LinuxServer/Engine.ini ] && ! grep -q 'NetServerMaxTickRate' /palworld/Pal/Saved/Config/LinuxServer/Engine.ini; then echo -e '\n[/Script/OnlineSubsystemUtils.IpNetDriver]\nNetServerMaxTickRate =90' >> /palworld/Pal/Saved/Config/LinuxServer/Engine.ini; fi"]
+          imagePullPolicy: IfNotPresent
           volumeMounts:
+            - name: vn-tmpvn-palworldsettingsvn-ini
+              mountPath: /tmp/PalWorldSettings.ini
+              subPath: ./tmp/PalWorldSettings.ini
             - name: vn-palworld
               mountPath: /palworld
       containers:
         - name: ${{ defaults.app_name }}
-          image: thijsvanloef/palworld-server-docker:latest
+          image: thijsvanloef/palworld-server-docker
           env:
             - name: ServerIP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
             - name: PUID
-              value: 1000
+              value: "1000"
             - name: PGID
-              value: 1000
+              value: "1000"
             - name: PORT
-              value: 8211
+              value: "8211"
             - name: PLAYERS
-              value: 30
+              value: "32"
             - name: MULTITHREADING
-              value: true
+              value: "true"
             - name: RCON_ENABLED
-              value: true
+              value: "true"
             - name: RCON_PORT
-              value: 25575
+              value: "25575"
             - name: ADMIN_PASSWORD
               value: ${{ inputs.ADMIN_PASSWORD }}
             - name: COMMUNITY
-              value: true
+              value: "true"
             - name: SERVER_PASSWORD
               value: ${{ inputs.SERVER_PASSWORD }}
             - name: SERVER_NAME
@@ -101,8 +120,8 @@ spec:
           resources:
             requests:
               cpu: 1000m
-              memory: 4096Mi
-              ephemeral-storage: 400Mi
+              memory: 5461Mi
+              ephemeral-storage: 100Mi
             limits:
               cpu: 4000m
               memory: 16384Mi
@@ -119,8 +138,37 @@ spec:
               protocol: UDP
           imagePullPolicy: IfNotPresent
           volumeMounts:
+            - name: vn-tmpvn-palworldsettingsvn-ini
+              mountPath: /tmp/PalWorldSettings.ini
+              subPath: ./tmp/PalWorldSettings.ini
             - name: vn-palworld
               mountPath: /palworld
+        - name: ${{ defaults.app_name }}-webbrowser
+          image: hurlenko/filebrowser
+          resources:
+            requests:
+              cpu: 50m
+              memory: 12Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          ports:
+            - containerPort: 8080
+              name: filebrowser
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: vn-palworld
+              mountPath: /data
+            - name: vn-config
+              mountPath: /config
+      volumes:
+        - name: vn-tmpvn-palworldsettingsvn-ini
+          configMap:
+            name: ${{ defaults.app_name }}
+            items:
+              - key: vn-tmpvn-palworldsettingsvn-ini
+                path: ./tmp/PalWorldSettings.ini
   volumeClaimTemplates:
     - metadata:
         annotations:
@@ -133,14 +181,25 @@ spec:
         resources:
           requests:
             storage: 10Gi
+    - metadata:
+        annotations:
+          path: /config
+          value: '0.1'
+        name: vn-config
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Mi
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ${{ defaults.app_name }}
+  name: ${{ defaults.app_name }}-external
   labels:
-    deploy.run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
 spec:
   type: NodePort
   ports:
@@ -148,9 +207,70 @@ spec:
       port: 8211
       targetPort: 8211
       name: game
+  selector:
+    app: ${{ defaults.app_name }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  ports:
     - protocol: UDP
       port: 27015
       targetPort: 27015
       name: query
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      name: filebrowser
+    - protocol: UDP
+      port: 8211
+      targetPort: 8211
+      name: game
   selector:
     app: ${{ defaults.app_name }}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    run.claw.cloud/app-deploy-manager-domain: ${{ defaults.app_host }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 1g
+    nginx.ingress.kubernetes.io/server-snippet: |
+      client_header_buffer_size 64k;
+      large_client_header_buffers 4 128k;
+    nginx.ingress.kubernetes.io/ssl-redirect: 'false'
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 64k
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($request_uri ~* \.(js|css|gif|jpe?g|png)) {
+        expires 30d;
+        add_header Cache-Control "public";
+      }
+spec:
+  rules:
+    - host: ${{ defaults.app_host }}.${{ SEALOS_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - pathType: Prefix
+            path: /()(.*)
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ SEALOS_CLOUD_DOMAIN }}
+      secretName: ${{ SEALOS_CERT_SECRET_NAME }}
