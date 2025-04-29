@@ -59,7 +59,7 @@ spec:
           image: excalidraw/excalidraw@sha256:36cd9a135e25b17e7e0b1b1d64df5fc1dad651eac72b6f2aa9c1d5401eddc68f
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 6Mi
             limits:
               cpu: 100m

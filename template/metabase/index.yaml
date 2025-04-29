@@ -88,7 +88,7 @@ spec:
               cpu: 500m
               memory: 512Mi
             requests:
-              cpu: 200m
+              cpu: 100m
               memory: 200Mi
           ports:
             - containerPort: 3000
@@ -198,7 +198,7 @@ spec:
           cpu: 500m
           memory: 512Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-pg
       switchPolicy:

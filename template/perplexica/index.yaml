@@ -155,7 +155,7 @@ spec:
           image: searxng/searxng:2025.2.20-28d1240fc
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 204Mi
             limits:
               cpu: 500m
@@ -279,7 +279,7 @@ spec:
               value: http://${{ defaults.app_name }}-searxng:8080
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 25Mi
             limits:
               cpu: 500m
@@ -422,7 +422,7 @@ spec:
               value: https://${{ defaults.app_host }}-backend.${{ CLAWCLOUD_CLOUD_DOMAIN }}
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 102Mi
               ephemeral-storage: 300Mi
             limits:

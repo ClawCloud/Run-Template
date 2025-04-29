@@ -115,7 +115,7 @@ spec:
               value: production
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 204Mi
             limits:
               cpu: 500m
@@ -235,7 +235,7 @@ spec:
           cpu: 500m
           memory: 512Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-pg
       switchPolicy:
@@ -315,7 +315,7 @@ spec:
           cpu: 500m
           memory: 512Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
       switchPolicy:
@@ -338,7 +338,7 @@ spec:
           cpu: 100m
           memory: 100Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 100Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
   terminationPolicy: Delete

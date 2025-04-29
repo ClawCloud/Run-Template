@@ -279,7 +279,7 @@ spec:
           image: ghcr.io/privatebin/fs:1.7.4
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 307Mi
             limits:
               cpu: 1000m

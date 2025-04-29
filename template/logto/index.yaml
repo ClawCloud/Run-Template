@@ -66,7 +66,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-pg
       switchPolicy:
@@ -207,7 +207,7 @@ spec:
               value: https://${{ defaults.app_host }}-admin.${{ CLAWCLOUD_CLOUD_DOMAIN }}
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 25Mi
             limits:
               cpu: 1000m

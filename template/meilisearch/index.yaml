@@ -73,7 +73,7 @@ spec:
               value: ${{ inputs.MEILI_MASTER_KEY }}
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 12Mi
             limits:
               cpu: 100m

@@ -79,7 +79,7 @@ spec:
               value: ambiance
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 51Mi
             limits:
               cpu: 500m

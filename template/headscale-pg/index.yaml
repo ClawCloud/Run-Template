@@ -65,7 +65,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: headscale-${{ defaults.app_suffix }}-pg
       switchPolicy:
@@ -234,7 +234,7 @@ spec:
           command: ["headscale", "serve"]
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
               cpu: 500m
@@ -283,7 +283,7 @@ spec:
               value: 'https://headscale-${{ defaults.app_suffix }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}'
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 25Mi
             limits:
               cpu: 100m

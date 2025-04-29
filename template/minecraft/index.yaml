@@ -105,7 +105,7 @@ spec:
             failureThreshold: 20
           resources:
             requests:
-              cpu: 1000m
+              cpu: 500m
               memory: 2048Mi
               ephemeral-storage: 400Mi
             limits:

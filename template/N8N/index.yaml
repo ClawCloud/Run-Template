@@ -72,7 +72,7 @@ spec:
               value: true
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 250Mi
             limits:
               cpu: 500m

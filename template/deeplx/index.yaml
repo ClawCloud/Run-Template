@@ -66,7 +66,7 @@ spec:
               value: ${{ inputs.AUTHKEY }}
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 6Mi
             limits:
               cpu: 100m

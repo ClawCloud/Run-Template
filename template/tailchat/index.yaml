@@ -119,7 +119,7 @@ spec:
               value: com.msgbyte.tailchat
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
             limits:
               cpu: 1000m
@@ -217,7 +217,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-mongodb
       volumeClaimTemplates:
@@ -302,7 +302,7 @@ spec:
               value: com.msgbyte.tailchat
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
             limits:
               cpu: 1000m
@@ -375,7 +375,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
       switchPolicy:
@@ -398,7 +398,7 @@ spec:
           cpu: 100m
           memory: 100Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 100Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
   terminationPolicy: Delete

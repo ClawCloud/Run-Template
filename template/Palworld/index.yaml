@@ -123,7 +123,7 @@ spec:
               value: ${{ inputs.SERVER_NAME }}
           resources:
             requests:
-              cpu: 1000m
+              cpu: 500m
               memory: 5461Mi
               ephemeral-storage: 100Mi
             limits:
@@ -151,7 +151,7 @@ spec:
           image: hurlenko/filebrowser
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 12Mi
             limits:
               cpu: 500m

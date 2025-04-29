@@ -57,7 +57,7 @@ spec:
           image: nocodb/nocodb:0.204.5
           resources:
             requests:
-              cpu: 200m
+              cpu: 100m
               memory: 409Mi
               ephemeral-storage: "400Mi"
             limits:

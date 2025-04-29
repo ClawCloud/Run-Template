@@ -99,7 +99,7 @@ spec:
           image: snowdreamtech/frps:0.59
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 12Mi
             limits:
               cpu: 100m

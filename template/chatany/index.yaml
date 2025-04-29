@@ -123,7 +123,7 @@ spec:
               value: ${{ inputs.CODE }}
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
             limits:
               cpu: 1000m

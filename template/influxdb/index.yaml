@@ -212,7 +212,7 @@ spec:
               ephemeral-storage: 1024Mi
               memory: 1024Mi
             requests:
-              cpu: 100m
+              cpu: 50m
               ephemeral-storage: 50Mi
               memory: 128Mi
           volumeMounts:

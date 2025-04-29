@@ -99,7 +99,7 @@ spec:
               cpu: 4096m
               memory: 2048Mi
             requests:
-              cpu: 256m
+              cpu: 128m
               memory: 50Mi
           ports:
             - containerPort: 5080

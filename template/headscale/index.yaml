@@ -107,7 +107,7 @@ spec:
           command: ["headscale", "serve"]
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
               cpu: 500m
@@ -156,7 +156,7 @@ spec:
               value: 'https://headscale-${{ defaults.app_suffix }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}'
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 25Mi
             limits:
               cpu: 100m

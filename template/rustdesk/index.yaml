@@ -68,7 +68,7 @@ spec:
               value: "${{ inputs.ENCRYPTED_ONLY }}"
           resources:
             requests:
-              cpu: 20m
+              cpu: 10m
               memory: 64Mi
             limits:
               cpu: 200m

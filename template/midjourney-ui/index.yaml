@@ -89,7 +89,7 @@ spec:
               value: ${{ inputs.HUGGINGFACE_TOKEN }}
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
             limits:
               cpu: 1000m

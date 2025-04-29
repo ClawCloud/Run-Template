@@ -55,7 +55,7 @@ spec:
               value: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 25Mi
             limits:
               cpu: 500m

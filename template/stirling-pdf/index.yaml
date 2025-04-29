@@ -150,7 +150,7 @@ spec:
               value: ${{ inputs.SYSTEM_GOOGLEVISIBILITY }}
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 307Mi
               ephemeral-storage: "200Mi"
             limits:

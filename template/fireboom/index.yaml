@@ -62,7 +62,7 @@ spec:
             - dev
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
               ephemeral-storage: 200Mi
             limits:

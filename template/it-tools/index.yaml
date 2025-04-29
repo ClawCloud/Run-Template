@@ -59,7 +59,7 @@ spec:
           image: ghcr.io/corentinth/it-tools:2024.5.13-a0bc346
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 6Mi
             limits:
               cpu: 100m

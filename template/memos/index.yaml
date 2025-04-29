@@ -65,7 +65,7 @@ spec:
               value: Asia/Shanghai
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 25Mi
             limits:
               cpu: 200m

@@ -86,7 +86,7 @@ spec:
               value: ${{ inputs.ALLOW_OPENAPI }}
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
             limits:
               cpu: 200m
@@ -182,7 +182,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-pg
       switchPolicy:

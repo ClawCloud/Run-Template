@@ -77,7 +77,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-pg
       switchPolicy:
@@ -260,7 +260,7 @@ spec:
               value: disable
           resources:
             requests:
-              cpu: 20m
+              cpu: 10m
               memory: 12Mi
             limits:
               cpu: 200m

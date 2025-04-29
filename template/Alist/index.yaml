@@ -78,7 +78,7 @@ spec:
               value: '022'
           resources:
             requests:
-              cpu: 20m
+              cpu: 10m
               memory: 12Mi
             limits:
               cpu: 200m

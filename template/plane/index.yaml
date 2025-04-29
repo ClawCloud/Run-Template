@@ -73,7 +73,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-pg
       switchPolicy:
@@ -248,7 +248,7 @@ spec:
               until ./bin/docker-entrypoint-migrator.sh &>/dev/null; do sleep 1; done
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 51Mi
             limits:
               cpu: 1000m
@@ -297,7 +297,7 @@ spec:
           cpu: 1000m
           memory: 1024Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
       switchPolicy:
@@ -320,7 +320,7 @@ spec:
           cpu: 100m
           memory: 100Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 100Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
   terminationPolicy: Delete
@@ -401,7 +401,7 @@ spec:
             - admin
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 12Mi
             limits:
               cpu: 100m
@@ -535,7 +535,7 @@ spec:
               value: "0"
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 25Mi
             limits:
               cpu: 500m
@@ -675,7 +675,7 @@ spec:
               value: "0"
           resources:
             requests:
-              cpu: 20m
+              cpu: 10m
               memory: 25Mi
             limits:
               cpu: 200m
@@ -793,7 +793,7 @@ spec:
               value: "0"
           resources:
             requests:
-              cpu: 20m
+              cpu: 10m
               memory: 204Mi
             limits:
               cpu: 200m
@@ -839,7 +839,7 @@ spec:
             - space
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 12Mi
             limits:
               cpu: 100m
@@ -898,7 +898,7 @@ spec:
             - web
           resources:
             requests:
-              cpu: 10m
+              cpu: 5m
               memory: 12Mi
             limits:
               cpu: 100m

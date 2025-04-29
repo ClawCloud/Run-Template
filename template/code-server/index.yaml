@@ -74,7 +74,7 @@ spec:
               value: ${{ inputs.PASSWORD }}
           resources:
             requests:
-              cpu: 200m
+              cpu: 100m
               memory: 200Mi
             limits:
               cpu: 2000m

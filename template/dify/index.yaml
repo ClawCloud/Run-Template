@@ -250,7 +250,7 @@ spec:
               value: ${{ defaults.inner_api_key }}
           resources:
             requests:
-              cpu: 200m
+              cpu: 100m
               memory: 256Mi
               ephemeral-storage: 200Mi
             limits:
@@ -370,7 +370,7 @@ spec:
               value: ${{ defaults.inner_api_key }}
           resources:
             requests:
-              cpu: 200m
+              cpu: 100m
               memory: 256Mi
               ephemeral-storage: 200Mi
             limits:
@@ -534,7 +534,7 @@ spec:
               value: https://marketplace.dify.ai
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 256Mi
             limits:
               cpu: 500m
@@ -625,7 +625,7 @@ spec:
               value: 'true'
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 128Mi
               ephemeral-storage: 200Mi
             limits:
@@ -801,7 +801,7 @@ spec:
               value: 'true'
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 128Mi
               ephemeral-storage: 200Mi
             limits:
@@ -932,7 +932,7 @@ spec:
           cpu: 500m
           memory: 2Gi
         requests:
-          cpu: 200m
+          cpu: 100m
           memory: 400Mi
       serviceAccountName: ${{ defaults.app_name }}-pg
       switchPolicy:
@@ -991,7 +991,7 @@ spec:
               cpu: 500m
               memory: 512Mi
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 51Mi
       restartPolicy: Never
   backoffLimit: 0
@@ -1075,7 +1075,7 @@ spec:
           cpu: 500m
           memory: 1Gi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 400Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
       switchPolicy:
@@ -1098,7 +1098,7 @@ spec:
           cpu: 100m
           memory: 100Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 100Mi
       serviceAccountName: ${{ defaults.app_name }}-redis
   terminationPolicy: Delete
@@ -1179,7 +1179,7 @@ spec:
           cpu: 500m
           memory: 1Gi
         requests:
-          cpu: 200m
+          cpu: 100m
           memory: 400Mi
       rsmTransformPolicy: ToSts
       serviceAccountName: ${{ defaults.app_name }}-weaviate

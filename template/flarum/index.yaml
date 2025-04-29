@@ -64,7 +64,7 @@ spec:
           cpu: 500m
           memory: 512Mi
         requests:
-          cpu: 100m
+          cpu: 50m
           memory: 102Mi
       serviceAccountName: ${{ defaults.app_name }}-mysql
       volumeClaimTemplates:
@@ -222,7 +222,7 @@ spec:
                   key: port
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
             limits:
               cpu: 200m

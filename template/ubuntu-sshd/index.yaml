@@ -61,7 +61,7 @@ spec:
           image: takeyamajp/ubuntu-sshd:ubuntu22.04
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 102Mi
             limits:
               cpu: 2000m
