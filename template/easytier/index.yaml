@@ -1,0 +1,133 @@
+apiVersion: app.claw.cloud/v1
+kind: Template
+metadata:
+  name: easytier
+spec:
+  title:                            # App Name
+  type: official                    # Template type: official, developer, community
+  author: pigeon-fancier             # Template author
+  author_id: 180503656              # Template author GitHub ID
+  date: 2025-05-07                  # Template submit date
+  url: https://github.com/EasyTier/EasyTier # App official website
+  gitRepo: https://github.com/EasyTier/EasyTier                          # App GitHub url
+  description: A simple, decentralized mesh VPN with WireGuard support.                       # App description
+  readme: https://github.com/EasyTier/EasyTier/blob/main/README.md                           # App Readme url
+  icon: https://easytier.cn/easytier.png                             # App icon url
+  templateType: inline
+  defaults:
+    app_host:
+      type: string
+      value: ${{ random(8) }}
+    app_name:
+      type: string
+      value: easytier-${{ random(8) }}
+    image_addr:
+      type: string
+      value: easytier/easytier:latest
+  inputs:
+    config_toml:
+      description: easytier TOML config
+      type: string
+      default: >
+        instance_name = "easytier"
+        ipv4 = "10.144.144.144"
+        dhcp = false
+        listeners = [
+            "tcp://0.0.0.0:11010",
+            "udp://0.0.0.0:11010",
+        ]
+        rpc_portal = "0.0.0.0:0"
+
+        [network_identity]
+        network_name = "easytier"
+        network_secret = ""
+
+        [flags]
+        enable_exit_node = true
+        latency_first = true
+        no_tun = true
+        proxy_forward_by_system = true
+        relay_all_peer_rpc = true
+      required: true
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${{ defaults.app_name }}
+  annotations:
+    originImageName: ${{ defaults.image_addr }}               # App docker image
+    deploy.run.claw.cloud/minReplicas: '1'
+    deploy.run.claw.cloud/maxReplicas: '1'
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    app: ${{ defaults.app_name }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  minReadySeconds: 10
+  serviceName: ${{ defaults.app_name }}
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: ${{ defaults.app_name }}
+          image: ${{ defaults.image_addr }}                    # App docker image
+          env: []
+          resources:
+            requests:
+              cpu: 10m
+              memory: 100Mi
+            limits:
+              cpu: 100m
+              memory: 512Mi
+          command: ['-c', '/etc/easytier/config.toml']
+          args: []
+          ports:
+            - containerPort: 11010
+              protocol: TCP
+              name: tcp-1
+            - containerPort: 11010
+              protocol: UDP
+              name: udp-1
+          imagePullPolicy: IfNotPresent
+      volumes:
+        - name: easytier-toml
+          configMap:
+            name: ${{ defaults.app_name }}
+            items:
+              - key: easytier-toml
+                path: /etc/easytier/config.toml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${{ defaults.app_name }}
+data:
+  easytier-toml: ${{ inputs.config_toml }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  type: NodePort
+  ports:
+    - protocol: UDP
+      port: 11010
+      targetPort: 11010
+      name: udp-1
+    - protocol: TCP
+      port: 11010
+      targetPort: 11010
+      name: tcp-1
+  selector:
+    app: ${{ defaults.app_name }}
