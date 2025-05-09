@@ -1,0 +1,161 @@
+apiVersion: app.claw.cloud/v1
+kind: Template
+metadata:
+  name: rust
+spec:
+  title: 'Rust Dedicated Server'
+  description: 'Rust Dedicated Server'
+  url: 'https://github.com/Didstopia/rust-server'
+  gitRepo: 'https://github.com/Didstopia/rust-server'
+  readme: 'https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/rust/README.md'
+  icon: 'https://raw.githubusercontent.com/labring-actions/templates/main/template/rust/rust_logo.jpg'
+  templateType: inline
+  locale: en
+  categories:
+    - game
+  defaults:
+    app_name:
+      type: string
+      value: rust-${{ random(8) }}
+    app_host:
+      type: string
+      value: rust-${{ random(8) }}
+  inputs:
+    RUST_RCON_PASSWORD:
+      description: "Secure administration access in the server with a password"
+      type: string
+      default: ""
+      required: true
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${{ defaults.app_name }}
+  annotations:
+    originImageName: didstopia/rust-server:latest
+    deploy.run.claw.cloud/minReplicas: '1'
+    deploy.run.claw.cloud/maxReplicas: '1'
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    app: ${{ defaults.app_name }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  minReadySeconds: 10
+  serviceName: ${{ defaults.app_name }}
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      automountServiceAccountToken: false
+      initContainers:
+        - name: take-data-dir-ownership
+          image: alpine
+          command: ["/bin/sh", "-c", "chown -R 1000:1000 /steamcmd/rust; chmod -R 770 /steamcmd/rust"]
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: vn-rust
+              mountPath: /steamcmd/rust
+      containers:
+        - name: ${{ defaults.app_name }}
+          image: didstopia/rust-server:latest
+          env:
+            - name: ServerIP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: RUST_SERVER_PORT
+              value: 28015
+            - name: RUST_SERVER_QUERYPORT
+              value: 28017
+            - name: RUST_RCON_PORT
+              value: 28016
+            - name: RUST_SERVER_MAXPLAYERS
+              value: 30
+            - name: RUST_APP_PORT
+              value: 28082
+            - name: RUST_RCON_PASSWORD
+              value: ${{ inputs.RUST_RCON_PASSWORD }}
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 5461Mi
+              ephemeral-storage: 100Mi
+            limits:
+              cpu: 4000m
+              memory: 16384Mi
+              ephemeral-storage: 400Mi
+          ports:
+            - containerPort: 28015
+              name: game
+              protocol: UDP
+            - containerPort: 28017
+              name: query
+              protocol: UDP
+            - containerPort: 28016
+              name: rcon
+              protocol: TCP
+            - containerPort: 28082
+              name: app
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: vn-rust
+              mountPath: /steamcmd/rust
+          livenessProbe:
+            tcpSocket:
+              port: app
+            initialDelaySeconds: 1200
+            timeoutSeconds: 5
+            periodSeconds: 15
+  volumeClaimTemplates:
+    - metadata:
+        annotations:
+          path: /steamcmd/rust
+          value: '20'
+        name: vn-rust
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  type: NodePort
+  ports:
+    - protocol: UDP
+      port: 28015
+      targetPort: 28015
+      name: game
+    - protocol: UDP
+      port: 28017
+      targetPort: 28017
+      name: query
+    - protocol: TCP
+      port: 28016
+      targetPort: 28016
+      name: rcon
+    - protocol: TCP
+      port: 28082
+      targetPort: 28082
+      name: app
+  selector:
+    app: ${{ defaults.app_name }}
