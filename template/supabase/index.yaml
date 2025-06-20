@@ -1,0 +1,465 @@
+
+apiVersion: app.claw.cloud/v1
+kind: Template
+metadata:
+  name: supabase
+spec:
+  title: 'Supabase'
+  type: community
+  author: jrmhx
+  author_id: 4JvqzJVnY_
+  date: 2025-05-14
+  url: 'https://supabase.com'
+  gitRepo: 'https://github.com/supabase/supabase'
+  description: 'A comprehensive Supabase deployment including PostgreSQL, Auth, Realtime, Storage, REST API, GraphQL, and Studio.'
+  readme: 'https://supabase.com/docs/guides/self-hosting'
+  icon: 'https://supabase.com/icons/icon-512x512.png'
+  templateType: inline
+  categories:
+    - backend
+    - database
+    - authentication
+    - realtime
+    - storage
+    - graphql
+    - functions
+    - analytics
+  defaults:
+    app_host:
+      type: string
+      value: ${{ random(8) }}
+    app_name:
+      type: string
+      value: supabase-${{ random(8) }}
+  inputs:
+    JWT_SECRET:
+      type: string
+      required: true
+    ANON_KEY:
+      type: string
+      required: true
+    SERVICE_ROLE_KEY:
+      type: string
+      required: true
+    POSTGRES_PASSWORD:
+      type: string
+      required: true
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: ${{ defaults.app_name }}-db
+spec:
+  clusterDefinitionRef: apecloud-postgresql
+  clusterVersionRef: ac-postgresql-15.3.0
+  componentSpecs:
+    - name: postgresql
+      componentDefRef: postgresql
+      replicas: 1
+      serviceAccountName: default
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes: [ "ReadWriteOnce" ]
+            resources:
+              requests:
+                storage: 10Gi
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+  terminationPolicy: Delete
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-db
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-auth
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-auth
+    spec:
+      containers:
+        - name: gotrue
+          image: supabase/gotrue:latest
+          ports:
+            - containerPort: 9999
+          env:
+            - name: GOTRUE_JWT_SECRET
+              value: ${{ inputs.JWT_SECRET }}
+            - name: GOTRUE_ANON_KEY
+              value: ${{ inputs.ANON_KEY }}
+            - name: GOTRUE_SITE_URL
+              value: http://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+            - name: DB_HOST
+              value: ${{ defaults.app_name }}-db
+            - name: DB_PASSWORD
+              value: ${{ inputs.POSTGRES_PASSWORD }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-auth
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-auth
+  ports:
+    - port: 9999
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-studio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-studio
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-studio
+    spec:
+      containers:
+        - name: studio
+          image: supabase/studio:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: STUDIO_PG_META_URL
+              value: http://${{ defaults.app_name }}-rest:3000
+            - name: SUPABASE_URL
+              value: http://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+            - name: SUPABASE_ANON_KEY
+              value: ${{ inputs.ANON_KEY }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-studio
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-studio
+  ports:
+    - port: 3000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - path: /studio
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-studio
+                port:
+                  number: 3000
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-auth
+                port:
+                  number: 9999
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
+
+---
+apiVersion: app.claw.cloud/v1
+kind: App
+metadata:
+  name: ${{ defaults.app_name }}
+spec:
+  data:
+    url: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+  displayType: normal
+  icon: 'https://supabase.com/icons/icon-512x512.png'
+  name: ${{ defaults.app_name }}
+  type: link
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-realtime
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-realtime
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-realtime
+    spec:
+      containers:
+        - name: realtime
+          image: supabase/realtime:latest
+          ports:
+            - containerPort: 4000
+          env:
+            - name: DB_HOST
+              value: ${{ defaults.app_name }}-db
+            - name: DB_PASSWORD
+              value: ${{ inputs.POSTGRES_PASSWORD }}
+            - name: DB_PORT
+              value: "5432"
+            - name: PORT
+              value: "4000"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-realtime
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-realtime
+  ports:
+    - port: 4000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-storage
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-storage
+    spec:
+      containers:
+        - name: storage
+          image: supabase/storage-api:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: ANON_KEY
+              value: ${{ inputs.ANON_KEY }}
+            - name: SERVICE_ROLE_KEY
+              value: ${{ inputs.SERVICE_ROLE_KEY }}
+            - name: POSTGREST_URL
+              value: http://${{ defaults.app_name }}-rest:3000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-storage
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-storage
+  ports:
+    - port: 5000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-rest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-rest
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-rest
+    spec:
+      containers:
+        - name: postgrest
+          image: postgrest/postgrest:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PGRST_DB_URI
+              value: postgres://postgres:${{ inputs.POSTGRES_PASSWORD }}@${{ defaults.app_name }}-db:5432/postgres
+            - name: PGRST_JWT_SECRET
+              value: ${{ inputs.JWT_SECRET }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-rest
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-rest
+  ports:
+    - port: 3000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-graphql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-graphql
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-graphql
+    spec:
+      containers:
+        - name: graphql
+          image: supabase/pg_graphql:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_HOST
+              value: ${{ defaults.app_name }}-db
+            - name: DB_PASSWORD
+              value: ${{ inputs.POSTGRES_PASSWORD }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-graphql
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-graphql
+  ports:
+    - port: 8080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-edge-functions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-edge-functions
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-edge-functions
+    spec:
+      containers:
+        - name: edge-functions
+          image: supabase/edge-runtime:latest
+          ports:
+            - containerPort: 9000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}-edge-functions
+spec:
+  selector:
+    app: ${{ defaults.app_name }}-edge-functions
+  ports:
+    - port: 9000
+
+---
+# Update Ingress to include new paths
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - path: /studio
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-studio
+                port:
+                  number: 3000
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-auth
+                port:
+                  number: 9999
+          - path: /rest
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-rest
+                port:
+                  number: 3000
+          - path: /realtime
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-realtime
+                port:
+                  number: 4000
+          - path: /storage
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-storage
+                port:
+                  number: 5000
+          - path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-graphql
+                port:
+                  number: 8080
+          - path: /functions
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}-edge-functions
+                port:
+                  number: 9000
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
