@@ -83,10 +83,8 @@ spec:
       containers:
         - name: ${{ defaults.app_name }}
           image: ghcr.io/toeverything/affine-graphql:stable-e98f035
-          command: ['sh', '-c', 'node ./scripts/self-host-predeploy && node ./dist/index.js']
+          command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js && node ./dist/main.js']
           env:
-            - name: NODE_OPTIONS
-              value: "--import=./scripts/register.js"
             - name: AFFINE_CONFIG_PATH
               value: /root/.affine/config
             - name: REDIS_SERVER_HOST
