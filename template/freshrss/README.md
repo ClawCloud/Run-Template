@@ -41,7 +41,6 @@ The template comes with the following predefined environment variables:
 The template creates the following storage volumes:
 
 - `/config`: Main configuration data storage
-- `/app/www/extensions`: FreshRSS extension plugins storage
 
 ### Network Configuration
 
@@ -80,7 +79,7 @@ A: When a new version is released, redeploy this template to get the latest vers
 A: All FreshRSS data is stored in the `/config` directory. Ensure this directory is backed up regularly.
 
 **Q: How do I add extension plugins?**  
-A: Log in as an admin and navigate to "Extension Management" to install official or third-party extensions.
+A: Log in as an admin and navigate to "Extension Management" to install official or third-party extensions, and your Extension will be stored in the `/config/app/www/extensions`.
 
 ## Support and Feedback
 

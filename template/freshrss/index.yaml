@@ -78,8 +78,6 @@ spec:
           volumeMounts:
             - name: vn-freshrss-config
               mountPath: /config
-            - name: vn-freshrss-extensions
-              mountPath: /app/www/extensions
           securityContext:
             seccompProfile:
               type: Unconfined
