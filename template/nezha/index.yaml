@@ -11,7 +11,7 @@ spec:
   url: 'https://github.com/nezhahq/nezha'
   gitRepo: 'https://github.com/nezhahq/nezha'
   description: 'A lightweight, self-hosted monitoring dashboard with client probes.'
-  readme: 'https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/nezha/README.md' 
+  readme: 'https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/nezha/README.md'
   icon: 'https://avatars.githubusercontent.com/u/105093572?s=48&v=4'
   templateType: inline
   locale: en
@@ -20,76 +20,67 @@ spec:
   defaults:
     app_host:
       type: string
-      value: ${{ random(12) }}
+      value: ${{ random(8) }}
     app_name:
       type: string
-      value: nezha-${{ random(6) }}
+      value: nezha-${{ random(8) }}
   inputs:
 
 ---
 
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: ${{ defaults.app_name }}
   annotations:
-    originImageName: lsposed/nezha
+    originImageName: ghcr.io/nezhahq/nezha:v1.13.0
     deploy.run.claw.cloud/minReplicas: '1'
     deploy.run.claw.cloud/maxReplicas: '1'
   labels:
     run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
     app: ${{ defaults.app_name }}
 spec:
+  serviceName: ${{ defaults.app_name }}
   replicas: 1
-  revisionHistoryLimit: 1
   selector:
     matchLabels:
       app: ${{ defaults.app_name }}
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 0
   template:
     metadata:
       labels:
         app: ${{ defaults.app_name }}
     spec:
+      terminationGracePeriodSeconds: 10
       automountServiceAccountToken: false
       containers:
         - name: ${{ defaults.app_name }}
-          image: lsposed/nezha
+          image: ghcr.io/nezhahq/nezha:v1.13.0
           imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: 50m
-              memory: 102Mi
+              memory: 51Mi
             limits:
-              cpu: 1000m
-              memory: 2048Mi
-          command:
-            - sh
-            - -c
-            - |
-              chmod +x /opt/nezha/dashboard/dashboard-linux-amd64
-              exec /opt/nezha/dashboard/dashboard-linux-amd64 
-          args: []
+              cpu: 500m
+              memory: 512Mi
           ports:
             - containerPort: 8008
           volumeMounts:
-            - name: vn-optvn-nezhavn-dashboardvn-data
-              mountPath: /opt/nezha/dashboard/data
-            - name: vn-staticvn-custom
-              mountPath: /opt/nezha/dashboard/resource/static/custom/
-            - name: vn-themevn-custom
-              mountPath: /opt/nezha/dashboard/resource/template/theme-custom/
-      volumes:
-        - name: vn-optvn-nezhavn-dashboardvn-data
-          emptyDir: {}
-        - name: vn-staticvn-custom
-          emptyDir: {}
-        - name: vn-themevn-custom
-          emptyDir: {}
+            - name: dashboard-data
+              mountPath: /dashboard/data
+  volumeClaimTemplates:
+    - metadata:
+        annotations:
+          path: /dashboard/data
+          value: '1'
+        name: dashboard-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+
 ---
 
 apiVersion: v1
@@ -100,9 +91,42 @@ metadata:
     run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
 spec:
   ports:
-    - port: 8008
+    - name: http
+      port: 8008
+      targetPort: 8008
   selector:
     app: ${{ defaults.app_name }}
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}-grpc
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}-grpc
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/proxy-body-size: 32m
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '300'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '300'
+spec:
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
+  rules:
+    - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - path: /proto.NezhaService/.*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8008
 
 ---
 
@@ -112,38 +136,77 @@ metadata:
   name: ${{ defaults.app_name }}
   labels:
     run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
-    run.claw.cloud/app-deploy-manager-domain: ${{ defaults.app_host }}
   annotations:
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/proxy-body-size: 32m
-    nginx.ingress.kubernetes.io/server-snippet: |
-      client_header_buffer_size 64k;
-      large_client_header_buffers 4 128k;
-    nginx.ingress.kubernetes.io/ssl-redirect: 'false'
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $http_upgrade;
+    nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-body-size: 32m
     nginx.ingress.kubernetes.io/client-body-buffer-size: 64k
     nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
-    nginx.ingress.kubernetes.io/proxy-send-timeout: '300'
-    nginx.ingress.kubernetes.io/proxy-read-timeout: '300'
-    nginx.ingress.kubernetes.io/configuration-snippet: |
+    nginx.ingress.kubernetes.io/server-snippet: |
       if ($request_uri ~* \.(js|css|gif|jpe?g|png)) {
         expires 30d;
         add_header Cache-Control "public";
       }
 spec:
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
   rules:
     - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
       http:
         paths:
-          - pathType: Prefix
-            path: /()(.*)
+          - path: /()(.*)
+            pathType: Prefix
             backend:
               service:
                 name: ${{ defaults.app_name }}
                 port:
                   number: 8008
-  tls:
-    - hosts:
-        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
-      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
+
+          - path: /api/v1/ws/server
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8008
+
+          - path: /api/v1/ws/terminal/
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8008
+
+          - path: /api/v1/ws/file/
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8008
+
+---
+apiVersion: app.claw.cloud/v1
+kind: App
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  data:
+    url: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+  displayType: normal
+  icon: "https://avatars.githubusercontent.com/u/105093572?s=48&v=4"
+  name: ${{ defaults.app_name }}
+  type: link
