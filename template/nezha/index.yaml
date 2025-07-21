@@ -23,7 +23,7 @@ spec:
       value: ${{ random(8) }}
     app_name:
       type: string
-      value: nezha-${{ random(6) }}
+      value: nezha-${{ random(8) }}
   inputs:
 
 ---
@@ -56,6 +56,9 @@ spec:
         - name: ${{ defaults.app_name }}
           image: ghcr.io/nezhahq/nezha:v1.13.0
           imagePullPolicy: IfNotPresent
+          env:
+            - name: NEZHA_DOMAIN
+              value: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
           resources:
             requests:
               cpu: 50m
@@ -65,18 +68,29 @@ spec:
               memory: 512Mi
           ports:
             - containerPort: 8008
-            - containerPort: 5555
           volumeMounts:
             - name: dashboard-data
-              mountPath: /opt/nezha/dashboard/data
-            - name: static-custom
-              mountPath: /opt/nezha/dashboard/resource/static/custom/
-            - name: theme-custom
-              mountPath: /opt/nezha/dashboard/resource/template/theme-custom/
+              mountPath: /dashboard/data
+        - name: gost
+          image: ginuerzh/gost
+          resources:
+            requests:
+              cpu: 50m
+              memory: 51Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          args:
+            - "-L"
+            - "http://:8080"
+            - "-F"
+            - "ws://127.0.0.1:8008/ws/server"
+          ports:
+            - containerPort: 8080
   volumeClaimTemplates:
     - metadata:
         annotations:
-          path: /opt/nezha/dashboard/data
+          path: /dashboard/data
           value: '1'
         name: dashboard-data
       spec:
@@ -85,29 +99,6 @@ spec:
         resources:
           requests:
             storage: 1Gi
-    - metadata:
-        annotations:
-          path: /opt/nezha/dashboard/resource/static/custom/
-          value: '1'
-        name: static-custom
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 256Mi
-    - metadata:
-        annotations:
-          path: /opt/nezha/dashboard/resource/template/theme-custom/
-          value: '1'
-        name: theme-custom
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 256Mi
-
 
 ---
 
@@ -118,40 +109,27 @@ metadata:
   labels:
     run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
 spec:
-  ports:
-    - name: http
-      port: 8008
-      targetPort: 8008
-    - name: grpc
-      port: 5555
-      targetPort: 5555
   selector:
     app: ${{ defaults.app_name }}
+  ports:
+    - name: nezha
+      port: 8008
+      targetPort: 8008
+    - name: gost
+      port: 8080
+      targetPort: 8080
 
 ---
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ${{ defaults.app_name }}-combined
+  name: ${{ defaults.app_name }}-grpc
   labels:
     run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
   annotations:
-    kubernetes.io/ingress.class: nginx
-
-    # UI traffic annotations
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/proxy-body-size: 32m
-    nginx.ingress.kubernetes.io/client-body-buffer-size: 64k
-    nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
-    nginx.ingress.kubernetes.io/proxy-send-timeout: '300'
-    nginx.ingress.kubernetes.io/proxy-read-timeout: '300'
-    nginx.ingress.kubernetes.io/server-snippet: |
-      # Cache static assets
-      if ($request_uri ~* \.(js|css|gif|jpe?g|png)) {
-        expires 30d;
-        add_header Cache-Control "public";
-      }
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
 spec:
   tls:
     - hosts:
@@ -161,20 +139,67 @@ spec:
     - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
       http:
         paths:
-          - path: /proto.NezhaService
-            pathType: Prefix
-            backend:
-              service:
-                name: ${{ defaults.app_name }}
-                port:
-                  number: 5555
-            nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
-
-          - path: /()(.*)
+          - path: /proto.NezhaService/
             pathType: Prefix
             backend:
               service:
                 name: ${{ defaults.app_name }}
                 port:
                   number: 8008
-            nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+spec:
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
+  rules:
+    - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - path: /api/v1/ws
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 8008
+
+---
+
+apiVersion: app.claw.cloud/v1
+kind: App
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  data:
+    url: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+  displayType: normal
+  icon: "https://avatars.githubusercontent.com/u/105093572?s=48&v=4"
+  name: ${{ defaults.app_name }}
+  type: link
