@@ -3,16 +3,16 @@ kind: Template
 metadata:
   name: openlist
 spec:
-  title: 'OpenList'
+  title: "OpenList"
   type: official
   author: ClawCloud Run
   author_id: 180503656
-  date: 2025-06-17
-  url: 'https://github.com/OpenListTeam/OpenList'
-  gitRepo: 'https://github.com/OpenListTeam/OpenList'
-  description: 'A file list/WebDAV program that supports multiple storages, powered by Gin and Solidjs.'
-  readme: 'https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/openlist/README.md'
-  icon: 'https://avatars.githubusercontent.com/u/215780325?s=48&v=4'
+  date: 2025-07-25
+  url: "https://github.com/OpenListTeam/OpenList"
+  gitRepo: "https://github.com/OpenListTeam/OpenList"
+  description: "A file list/WebDAV program that supports multiple storages, powered by Gin and Solidjs."
+  readme: "https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/openlist/README.md"
+  icon: "https://raw.githubusercontent.com/OpenListTeam/Logo/main/logo.svg"
   templateType: inline
   locale: en
   categories:
@@ -26,16 +26,17 @@ spec:
       value: openlist-${{ random(8) }}
   inputs:
     USERNAME:
-      description: 'Default Username'
+      description: "Default Username"
       type: choice
       options:
         - admin
+      default: admin
       required: true
     PASSWORD:
-        description: "Default Password"
-        type: string
-        default: ""
-        required: true
+      description: "Default Password"
+      type: string
+      default: ""
+      required: true
 
 ---
 apiVersion: apps/v1
@@ -43,9 +44,9 @@ kind: StatefulSet
 metadata:
   name: ${{ defaults.app_name }}
   annotations:
-    originImageName: ghcr.io/openlistteam/openlist-git:latest-lite-aria2
-    deploy.run.claw.cloud/minReplicas: '1'
-    deploy.run.claw.cloud/maxReplicas: '1'
+    originImageName: openlistteam/openlist:latest-lite
+    deploy.run.claw.cloud/minReplicas: "1"
+    deploy.run.claw.cloud/maxReplicas: "1"
   labels:
     run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
     app: ${{ defaults.app_name }}
@@ -66,23 +67,25 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: ${{ defaults.app_name }}
-          image: ghcr.io/openlistteam/openlist-git:latest-lite-aria2
+          image: openlistteam/openlist:latest-lite
           env:
             - name: TZ
               value: Asia/Shanghai
             - name: PUID
-              value: '0'
+              value: "0"
             - name: PGID
-              value: '0'
+              value: "0"
             - name: UMASK
-              value: '022'
+              value: "022"
+            - name: OPENLIST_ADMIN_PASSWORD
+              value: ${{ inputs.PASSWORD }}
           resources:
             requests:
               cpu: 20m
-              memory: 51Mi
+              memory: 64Mi
             limits:
-              cpu: 400m
-              memory: 1024Mi
+              cpu: 200m
+              memory: 128Mi
           command: []
           args: []
           ports:
@@ -96,7 +99,7 @@ spec:
     - metadata:
         annotations:
           path: /opt/openlist/data
-          value: '1'
+          value: "1"
         name: vn-data
       spec:
         accessModes:
@@ -128,21 +131,11 @@ metadata:
     run.claw.cloud/app-deploy-manager-domain: ${{ defaults.app_host }}
   annotations:
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/proxy-body-size: 32m
-    nginx.ingress.kubernetes.io/server-snippet: |
-      client_header_buffer_size 64k;
-      large_client_header_buffers 4 128k;
-    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/proxy-body-size: 512m
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
-    nginx.ingress.kubernetes.io/client-body-buffer-size: 64k
-    nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
-    nginx.ingress.kubernetes.io/proxy-send-timeout: '300'
-    nginx.ingress.kubernetes.io/proxy-read-timeout: '300'
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      if ($request_uri ~* \.(js|css|gif|jpe?g|png)) {
-        expires 30d;
-        add_header Cache-Control "public";
-      }
 spec:
   rules:
     - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
@@ -171,65 +164,6 @@ spec:
   data:
     url: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
   displayType: normal
-  icon: "https://avatars.githubusercontent.com/u/215780325?s=48&v=4"
+  icon: "https://raw.githubusercontent.com/OpenListTeam/Logo/main/logo.svg"
   name: OpenList
   type: link
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: ${{ defaults.app_name }}
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: ${{ defaults.app_name }}
-rules:
-- apiGroups: ["apps"]
-  resources: ["statefulsets"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["pods/exec"]
-  verbs: ["create"]
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: ${{ defaults.app_name }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: ${{ defaults.app_name }}
-subjects:
-- kind: ServiceAccount
-  name: ${{ defaults.app_name }}
-
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: ${{ defaults.app_name }}-password
-spec:
-  completions: 1
-  template:
-    spec:
-      containers:
-        - name: ${{ defaults.app_name }}-password
-          image: bitnami/kubectl
-          command:
-            - /bin/sh
-            - -c
-            - |
-              until kubectl exec statefulset/${{ defaults.app_name }} -- curl -I http://127.0.0.1:5244 &>/dev/null; do sleep 1; done
-              kubectl exec statefulset/${{ defaults.app_name }} -- ./openlist admin set ${{ inputs.PASSWORD }}
-      restartPolicy: Never
-      serviceAccountName: ${{ defaults.app_name }}
-      serviceAccount:  ${{ defaults.app_name }}
-  backoffLimit: 0
-  ttlSecondsAfterFinished: 300
