@@ -64,6 +64,8 @@ spec:
       labels:
         app: ${{ defaults.app_name }}
     spec:
+      securityContext:
+        fsGroup: 1001
       terminationGracePeriodSeconds: 10
       automountServiceAccountToken: false
       containers:
@@ -72,10 +74,6 @@ spec:
           env:
             - name: TZ
               value: Asia/Shanghai
-            - name: PUID
-              value: "0"
-            - name: PGID
-              value: "0"
             - name: UMASK
               value: "022"
             - name: OPENLIST_ADMIN_PASSWORD
