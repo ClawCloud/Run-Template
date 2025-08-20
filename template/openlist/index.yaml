@@ -66,6 +66,7 @@ spec:
     spec:
       securityContext:
         fsGroup: 1001
+        fsGroupChangePolicy: Always
       terminationGracePeriodSeconds: 10
       automountServiceAccountToken: false
       containers:
