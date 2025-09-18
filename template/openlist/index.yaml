@@ -66,16 +66,26 @@ spec:
     spec:
       terminationGracePeriodSeconds: 10
       automountServiceAccountToken: false
+      initContainers:
+        - name: fix-permissions
+          image: busybox:1.36
+          command: ['sh', '-c', 'chown -R 1001:1001 /opt/openlist/data && chmod -R 777 /opt/openlist/data']
+          volumeMounts:
+            - name: vn-data
+              mountPath: /opt/openlist/data
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
       containers:
         - name: ${{ defaults.app_name }}
           image: openlistteam/openlist:latest-lite
+          securityContext:
+            runAsUser: 1001
+            runAsGroup: 1001
+            runAsNonRoot: true
           env:
             - name: TZ
               value: Asia/Shanghai
-            - name: PUID
-              value: "0"
-            - name: PGID
-              value: "0"
             - name: UMASK
               value: "022"
             - name: OPENLIST_ADMIN_PASSWORD
