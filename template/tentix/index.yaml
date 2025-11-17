@@ -1,0 +1,343 @@
+apiVersion: app.claw.cloud/v1
+kind: Template
+metadata:
+  name: tentix
+spec:
+  title: 'Tentix'
+  type: official
+  author: ClawCloud Run
+  author_id: 180503656
+  date: 2025-04-17
+  url: 'https://github.com/labring/tentix'
+  gitRepo: 'https://github.com/labring/tentix'
+  templateType: inline
+  categories:
+    - ai
+    - Free-Plan-Compatible
+    - dev-ops
+  defaults:
+    app_host:
+      type: string
+      value: tentix-${{ random(8) }}
+    encryption_key:
+      type: string
+      value: bicozuyqnttjjvbokpygogrh
+    domain:
+      type: string
+      value: ${{ defaults.app_host }}
+  inputs:
+    OPENAI_API_KEY:
+      description: OpenAI API Key
+      type: string
+      default: ''
+      required: true
+    OPENAI_BASE_URL:
+      description: OpenAI endpoint base URL
+      type: string
+      default: https://api.openai.com/v1
+      required: true
+  readme: https://jsdelivr.icloudnative.io/gh/labring/tentix@main/README.md
+  icon: >-
+    https://jsdelivr.icloudnative.io/gh/labring/tentix@refs/heads/main/frontend/public/logo.svg
+  description: >-
+    A FastGPT-powered AI customer service platform with 10x accelerated
+    resolution.
+  draft: false
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  finalizers:
+    - cluster.kubeblocks.io/finalizer
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+    clusterversion.kubeblocks.io/name: postgresql-14.8.0
+    clawcloud-db-provider-cr: ${{ defaults.app_name }}-pg
+  annotations: {}
+  name: ${{ defaults.app_name }}-pg
+spec:
+  affinity:
+    nodeLabels: {}
+    podAntiAffinity: Preferred
+    tenancy: SharedNode
+    topologyKeys: []
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.8.0
+  componentSpecs:
+    - componentDefRef: postgresql
+      monitor: true
+      name: postgresql
+      replicas: 1
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 50m
+          memory: 51Mi
+      serviceAccountName: ${{ defaults.app_name }}-pg
+      switchPolicy:
+        type: Noop
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            storageClassName: openebs-backup
+  terminationPolicy: Delete
+  tolerations: []
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    clawcloud-db-provider-cr: ${{ defaults.app_name }}-pg
+    app.kubernetes.io/instance: ${{ defaults.app_name }}-pg
+    app.kubernetes.io/managed-by: kbcli
+  name: ${{ defaults.app_name }}-pg
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    clawcloud-db-provider-cr: ${{ defaults.app_name }}-pg
+    app.kubernetes.io/instance: ${{ defaults.app_name }}-pg
+    app.kubernetes.io/managed-by: kbcli
+  name: ${{ defaults.app_name }}-pg
+rules:
+  - apiGroups:
+      - '*'
+    resources:
+      - '*'
+    verbs:
+      - '*'
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    clawcloud-db-provider-cr: ${{ defaults.app_name }}-pg
+    app.kubernetes.io/instance: ${{ defaults.app_name }}-pg
+    app.kubernetes.io/managed-by: kbcli
+  name: ${{ defaults.app_name }}-pg
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ${{ defaults.app_name }}-pg
+subjects:
+  - kind: ServiceAccount
+    name: ${{ defaults.app_name }}-pg
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: ${{ defaults.app_name }}
+
+---
+apiVersion: objectstorage.sealos.io/v1
+kind: ObjectStorageBucket
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  policy: publicRead
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    app: ${{ defaults.app_name }}
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}
+    spec:
+      initContainers:
+        - name: db-migrate
+          image: limbo2342/tentix:migrate.10.22.x1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATABASE_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: ${{ defaults.app_name }}-pg-conn-credential
+                  key: port
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ${{ defaults.app_name }}-pg-conn-credential
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${{ defaults.app_name }}-pg-conn-credential
+                  key: password
+            - name: DATABASE_URL
+              value: >-
+                postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@${{ defaults.app_name }}-pg-postgresql.${{ CLAWCLOUD_NAMESPACE }}.svc:$(DATABASE_PORT)
+      containers:
+        - name: ${{ defaults.app_name }}-tentix
+          securityContext: {}
+          image: limbo2342/tentix:dev-2025-10-23-x.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: DATABASE_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: ${{ defaults.app_name }}-pg-conn-credential
+                  key: port
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ${{ defaults.app_name }}-pg-conn-credential
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${{ defaults.app_name }}-pg-conn-credential
+                  key: password
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: object-storage-key
+                  key: accessKey
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: object-storage-key
+                  key: secretKey
+            - name: MINIO_EXTERNAL_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: object-storage-key
+                  key: external
+            - name: MINIO_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: object-storage-key--${{ defaults.app_name }}-tentix
+                  key: bucket
+            - name: MINIO_ENDPOINT
+              value: https://$(MINIO_EXTERNAL_ENDPOINT)
+            - name: ENCRYPTION_KEY
+              value: Ymljb3p1eXFudHRqanZib2tweWdvZ3Jo
+            - name: DATABASE_URL
+              value: >-
+                postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@${{ defaults.app_name }}-pg-postgresql.${{ CLAWCLOUD_NAMESPACE }}.svc:$(DATABASE_PORT)
+            - name: MAX_AI_RESPONSES_PER_TICKET
+              value: '30'
+            - name: OPENAI_BASE_URL
+              value: https://api.openai.com/v1
+            - name: OPENAI_API_KEY
+              value: null
+            - name: SUMMARY_MODEL
+              value: gpt-5-mini
+            - name: EMBEDDING_MODEL
+              value: text-embedding-3-large
+            - name: CHAT_MODEL
+              value: gpt-5-mini
+            - name: VECTOR_BACKEND
+              value: internal
+            - name: APP_URL
+              value: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+            - name: TARGET_PLATFORM
+              value: generic
+            - name: NODE_ENV
+              value: production
+            - name: DISABLE_REGISTER
+              value: 'false'
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    run.claw.cloud/app-deploy-manager-domain: ${{ defaults.app_host }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 32m
+    nginx.ingress.kubernetes.io/server-snippet: |
+      client_header_buffer_size 64k;
+      large_client_header_buffers 4 128k;
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 64k
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '300'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '300'
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($request_uri ~* \.(js|css|gif|jpe?g|png)) {
+        expires 30d;
+        add_header Cache-Control "public";
+      }
+spec:
+  rules:
+    - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
+
+---
+apiVersion: app.sealos.io/v1
+kind: App
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  data:
+    url: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+  displayType: normal
+  icon: >-
+    https://raw.githubusercontent.com/labring/tentix/refs/heads/main/frontend/public/logo.svg
+  name: ${{ defaults.app_name }}
+  type: link
