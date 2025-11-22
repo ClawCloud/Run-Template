@@ -1,4 +1,4 @@
-## Introduction to Alist
+## Introduction to Cloudreve
 
 Cloudreve is a powerful, self-hosted cloud storage management platform designed to help users build their own private cloud environments with ease. Whether you’re managing personal files or deploying enterprise-grade storage solutions, Cloudreve offers a comprehensive suite of tools to unify, share, and control your data across multiple storage backends. With its elegant interface, flexible architecture, and rich feature set, Cloudreve empowers individuals and organizations to take full ownership of their digital assets.
 
