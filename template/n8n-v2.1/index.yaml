@@ -1,0 +1,245 @@
+apiVersion: app.claw.cloud/v1
+kind: Template
+metadata:
+  name: n8n
+spec:
+  title: 'n8n-v2.1'
+  type: official
+  author: ClawCloud Run
+  author_id: 180503656
+  date: 2025-12-18
+  url: 'https://n8n.io/'
+  gitRepo: 'https://github.com/n8n-io/n8n'
+  description: 'Free and source-available fair-code licensed workflow automation tool. Easily automate tasks across different services.'
+  readme: 'https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/template/N8N/README.md'
+  icon: 'https://n8n.io/favicon.ico'
+  templateType: inline
+  categories:
+    - ai
+    - Free-Plan-Compatible
+  defaults:
+    app_host:
+      type: string
+      value: n8n-${{ random(8) }}
+    app_name:
+      type: string
+      value: n8n-${{ random(8) }}
+    runner_token:
+      type: string
+      value: ${{ random(32) }}
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${{ defaults.app_name }}
+  annotations:
+    originImageName: n8nio/n8n:2.1.1
+    deploy.run.claw.cloud/minReplicas: '1'
+    deploy.run.claw.cloud/maxReplicas: '1'
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    app: ${{ defaults.app_name }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  minReadySeconds: 10
+  serviceName: ${{ defaults.app_name }}
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      automountServiceAccountToken: false
+      initContainers:
+        - name: take-data-dir-ownership
+          image: alpine
+          command: ["/bin/sh", "-c", "chown 1000:1000 /data"]
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: vn-homevn-nodevn-vn-n8n
+              mountPath: /data
+      containers:
+        - name: ${{ defaults.app_name }}
+          image: n8nio/n8n:2.1.1
+          env:
+            - name: N8N_PORT
+              value: "5678"
+            - name: WEBHOOK_URL
+              value: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}/
+            - name: QUEUE_HEALTH_CHECK_ACTIVE
+              value: "true"
+            - name: N8N_RUNNERS_ENABLED
+              value: "true"
+            - name: N8N_RUNNERS_AUTH_TOKEN
+              value: ${{ defaults.runner_token }}
+            - name: N8N_RUNNERS_MODE
+              value: "external"
+            - name: N8N_RUNNERS_BROKER_LISTEN_ADDRESS
+              value: "0.0.0.0"
+            - name: N8N_RUNNERS_BROKER_PORT
+              value: "5679"
+            - name: N8N_NATIVE_PYTHON_RUNNER
+              value: "true"
+            - name: OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 102Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+          ports:
+            - name: http
+              protocol: TCP
+              containerPort: 5678
+            - name: runner-broker
+              protocol: TCP
+              containerPort: 5679
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: vn-homevn-nodevn-vn-n8n
+              mountPath: /home/node/.n8n
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        annotations:
+          path: /home/node/.n8n
+          value: '1'
+        name: vn-homevn-nodevn-vn-n8n
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  ports:
+    - name: http
+      port: 5678
+      targetPort: 5678
+      protocol: TCP
+    - name: runner-broker
+      port: 5679
+      targetPort: 5679
+      protocol: TCP
+  selector:
+    app: ${{ defaults.app_name }}
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    run.claw.cloud/app-deploy-manager-domain: ${{ defaults.app_host }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 32m
+    nginx.ingress.kubernetes.io/server-snippet: |
+      client_header_buffer_size 64k;
+      large_client_header_buffers 4 128k;
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 64k
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '300'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '300'
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($request_uri ~* \.(js|css|gif|jpe?g|png)) {
+        expires 30d;
+        add_header Cache-Control "public";
+      }
+spec:
+  rules:
+    - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - pathType: Prefix
+            path: /()(.*)
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 5678
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ defaults.app_name }}-runner
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    app: ${{ defaults.app_name }}-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}-runner
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}-runner
+    spec:
+      terminationGracePeriodSeconds: 10
+      automountServiceAccountToken: false
+      containers:
+        - name: ${{ defaults.app_name }}-runner
+          image: n8nio/runners:2.1.1
+          env:
+            - name: N8N_RUNNERS_AUTH_TOKEN
+              value: ${{ defaults.runner_token }}
+            - name: N8N_RUNNERS_MAX_PAYLOAD_SIZE
+              value: "1048576"
+            - name: N8N_RUNNERS_HEARTBEAT_INTERVAL
+              value: "30000"
+            - name: N8N_RUNNERS_TASK_BROKER_URI
+              value: http://${{ defaults.app_name }}.${{ CLAWCLOUD_NAMESPACE }}.svc.cluster.local:5679
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      restartPolicy: Always
+
+---
+apiVersion: app.claw.cloud/v1
+kind: App
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  data:
+    url: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+  displayType: normal
+  icon: "https://n8n.io/favicon.ico"
+  name: ${{ defaults.app_name }}
+  type: link
