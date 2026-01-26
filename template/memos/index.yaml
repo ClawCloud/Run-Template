@@ -37,7 +37,7 @@ kind: StatefulSet
 metadata:
   name: ${{ defaults.app_name }}
   annotations:
-    originImageName: ghcr.io/usememos/memos:latest
+    originImageName: ghcr.io/usememos/memos:stable
     deploy.run.claw.cloud/minReplicas: '1'
     deploy.run.claw.cloud/maxReplicas: '1'
   labels:
@@ -60,7 +60,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: ${{ defaults.app_name }}
-          image: ghcr.io/usememos/memos:latest
+          image: ghcr.io/usememos/memos:stable
           env:
             - name: MEMOS_PORT
               value: "5230"
