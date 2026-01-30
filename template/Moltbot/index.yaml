@@ -1,0 +1,239 @@
+apiVersion: app.claw.cloud/v1
+kind: Template
+metadata:
+  name: moltbot
+spec:
+  title: 'Moltbot - AI Agent Gateway'
+  url: 'https://www.molt.bot/'
+  gitRepo: 'GitHub - moltbot/moltbot: Your own personal AI assistant. Any OS. Any Platform. The lobster way. 🦞'
+  author: 'ClawCloud Run'
+  description: 'An AI agent gateway with multi-channel support including WhatsApp, Telegram, and Discord integration'
+  readme: 'https://raw.githubusercontent.com/moltbot/moltbot/refs/heads/main/README.md'
+  icon: 'https://www.molt.bot/favicon.svg'
+  templateType: inline
+  locale: en
+  categories:
+    - ai
+    - tool
+  defaults:
+    app_name:
+      type: string
+      value: moltbot-${{ random(8) }}
+    app_host:
+      type: string
+      value: moltbot-${{ random(8) }}
+    gateway_token:
+      type: string
+      value: ${{ random(64) }}
+  inputs:
+    openai_base_url:
+      description: 'OpenAI-compatible base URL'
+      type: string
+      default: 'https://api.openai.com/v1'
+      required: false
+    openai_api_key:
+      description: 'API key for the OpenAI-compatible provider'
+      type: string
+      default: ''
+      required: false
+    openai_model:
+      description: 'Default model ID'
+      type: string
+      default: 'gpt-5.2'
+      required: false
+    anthropic_base_url:
+      description: 'Anthropic-compatible base URL'
+      type: string
+      default: 'https://api.anthropic.com/v1/messages'
+      required: false
+    anthropic_api_key:
+      description: 'API key for the Anthropic-compatible provider'
+      type: string
+      default: ''
+      required: false
+    anthropic_model:
+      description: 'Default model ID'
+      type: string
+      default: 'claude-opus-4-5-20251101'
+      required: false
+---
+# Application StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${{ defaults.app_name }}
+  annotations:
+    originImageName: ghcr.io/yangchuansheng/clawdbot:20260128025645
+    deploy.run.claw.cloud/minReplicas: '1'
+    deploy.run.claw.cloud/maxReplicas: '1'
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  revisionHistoryLimit: 1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ defaults.app_name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ defaults.app_name }}
+    spec:
+      automountServiceAccountToken: false
+      initContainers:
+        - name: take-data-dir-ownership
+          image: alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              chown 1000:1000 /home/clawdbot/.clawdbot
+              chown 1000:1000 /home/clawdbot/workspace
+              chown 1000:1000 /home/clawdbot/.npm
+              cat > /home/clawdbot/.clawdbot/clawdbot.json <<EOF
+              {"models":{"mode":"merge","providers":{"openai":{"baseUrl":"${{ inputs.openai_base_url }}","apiKey":"${{ inputs.openai_api_key }}","auth":"api-key","api":"openai-completions","models":[{"id":"${{ inputs.openai_model }}","name":"${{ inputs.openai_model }}","api":"openai-completions","reasoning":false,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":200000,"maxTokens":8192}]},"anthropic":{"baseUrl":"${{ inputs.anthropic_base_url }}","apiKey":"${{ inputs.anthropic_api_key }}","auth":"api-key","api":"anthropic-messages","models":[{"id":"${{ inputs.anthropic_model }}","name":"${{ inputs.anthropic_model }}","reasoning":false,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":200000,"maxTokens":8192}]}}},"agents":{"defaults":{"model":{"primary":"anthropic/${{ inputs.anthropic_model }}"},"models":{"openai/${{ inputs.openai_model }}":{},"anthropic/${{ inputs.anthropic_model }}":{}},"compaction":{"mode":"safeguard"},"workspace":"/home/clawdbot/workspace","maxConcurrent":4,"subagents":{"maxConcurrent":8}}},"messages":{"ackReactionScope":"group-mentions"},"commands":{"native":"auto","nativeSkills":"auto","restart":true},"gateway":{"controlUi":{"enabled":true,"allowInsecureAuth":true}},"plugins":{"entries":{"telegram":{"enabled":true}}}}
+              EOF
+          resources: {}
+          volumeMounts:
+            - name: vn-homevn-clawdbotvn-vn-clawdbot
+              mountPath: /home/clawdbot/.clawdbot
+            - name: vn-homevn-clawdbotvn-workspace
+              mountPath: /home/clawdbot/workspace
+            - name: vn-homevn-clawdbotvn-npm
+              mountPath: /home/clawdbot/.npm
+      containers:
+        - name: ${{ defaults.app_name }}
+          image: ghcr.io/yangchuansheng/clawdbot:20260128025645
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: CLAWDBOT_GATEWAY_BIND
+              value: 0.0.0.0
+            - name: CLAWDBOT_GATEWAY_TOKEN
+              value: ${{ defaults.gateway_token }}
+            - name: DISCORD_BOT_TOKEN
+            - name: TELEGRAM_BOT_TOKEN
+            - name: WHATSAPP_SESSION_PATH
+              value: /home/clawdbot/.clawdbot/whatsapp
+            - name: SLACK_BOT_TOKEN
+            - name: SLACK_APP_TOKEN
+            - name: GATEWAY_BIND
+              value: lan
+          ports:
+            - name: gateway
+              containerPort: 18789
+              protocol: TCP
+          volumeMounts:
+            - name: vn-homevn-clawdbotvn-vn-clawdbot
+              mountPath: /home/clawdbot/.clawdbot
+            - name: vn-homevn-clawdbotvn-workspace
+              mountPath: /home/clawdbot/workspace
+            - name: vn-homevn-clawdbotvn-npm
+              mountPath: /home/clawdbot/.npm
+          resources:
+            requests:
+              cpu: 100m
+              memory: 204Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+  volumeClaimTemplates:
+    - metadata:
+        annotations:
+          path: /home/clawdbot/.clawdbot
+          value: '0.1'
+        name: vn-homevn-clawdbotvn-vn-clawdbot
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 0.1Gi
+    - metadata:
+        annotations:
+          path: /home/clawdbot/workspace
+          value: '0.1'
+        name: vn-homevn-clawdbotvn-workspace
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 0.1Gi
+    - metadata:
+        annotations:
+          path: /home/clawdbot/.npm
+          value: '0.2'
+        name: vn-homevn-clawdbotvn-npm
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 0.2Gi
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 18789
+      targetPort: 18789
+      protocol: TCP
+      name: gateway
+  selector:
+    app: ${{ defaults.app_name }}
+
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+    run.claw.cloud/app-deploy-manager-domain: ${{ defaults.app_host }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 32m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/backend-protocol: WS
+spec:
+  rules:
+    - host: ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: ${{ defaults.app_name }}
+                port:
+                  number: 18789
+  tls:
+    - hosts:
+        - ${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+      secretName: ${{ CLAWCLOUD_CERT_SECRET_NAME }}
+
+---
+# App Resource
+apiVersion: app.claw.cloud/v1
+kind: App
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    run.claw.cloud/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  data:
+    url: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
+  displayType: normal
+  icon: "https://www.molt.bot/favicon.svg"
+  name: "Moltbot"
+  type: link
