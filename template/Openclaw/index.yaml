@@ -1,15 +1,18 @@
 apiVersion: app.claw.cloud/v1
 kind: Template
 metadata:
-  name: moltbot
+  name: openclaw
 spec:
-  title: 'Moltbot - AI Agent Gateway'
-  url: 'https://www.molt.bot/'
-  gitRepo: 'GitHub - moltbot/moltbot: Your own personal AI assistant. Any OS. Any Platform. The lobster way. 🦞'
+  title: 'OpenClaw (Clawdbot/Moltbot)'
+  type: official
   author: 'ClawCloud Run'
-  description: 'An AI agent gateway with multi-channel support including WhatsApp, Telegram, and Discord integration'
-  readme: 'https://raw.githubusercontent.com/moltbot/moltbot/refs/heads/main/README.md'
-  icon: 'https://www.molt.bot/favicon.svg'
+  author_id: 180503656
+  date: 2026-01-27
+  url: 'https://openclaw.ai/'
+  gitRepo: 'https://github.com/openclaw/openclaw'
+  description: 'Your own personal AI assistant. Any OS. Any Platform. The lobster way. 🦞'
+  readme: 'https://raw.githubusercontent.com/openclaw/openclaw/refs/heads/main/README.md'
+  icon: 'https://openclaw.ai/favicon.svg'
   templateType: inline
   locale: en
   categories:
@@ -18,10 +21,10 @@ spec:
   defaults:
     app_name:
       type: string
-      value: moltbot-${{ random(8) }}
+      value: openclaw-${{ random(8) }}
     app_host:
       type: string
-      value: moltbot-${{ random(8) }}
+      value: openclaw-${{ random(8) }}
     gateway_token:
       type: string
       value: ${{ random(64) }}
@@ -234,6 +237,6 @@ spec:
   data:
     url: https://${{ defaults.app_host }}.${{ CLAWCLOUD_CLOUD_DOMAIN }}
   displayType: normal
-  icon: "https://www.molt.bot/favicon.svg"
-  name: "Moltbot"
+  icon: "https://openclaw.ai/favicon.svg"
+  name: "OpenClaw"
   type: link
